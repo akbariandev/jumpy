@@ -1,3 +1,7 @@
-# chain-of-bots
+# Jumpy ( DAG Based Chain)
 
-go run cmd/main.go run -p 10000 
+How to run:
+
+```sh
+go run cmd/main.go run -p 10000
+```
