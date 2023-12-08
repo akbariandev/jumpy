@@ -6,7 +6,7 @@ import (
 )
 
 var listenPort int
-var targetPeer string
+var hostGroupName string
 
 var rootCmd = &cobra.Command{
 	Use:   "ChainOfBots",
@@ -22,5 +22,5 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().IntVarP(&listenPort, "listenPort", "p", 1000, "listen Port number")
-	rootCmd.PersistentFlags().StringVarP(&targetPeer, "targetPeer", "t", "", "connect to one peer")
+	rootCmd.PersistentFlags().StringVarP(&hostGroupName, "hostGroupname", "g", "", "name of host group")
 }

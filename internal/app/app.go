@@ -7,15 +7,18 @@ import (
 	_ "github.com/libp2p/go-libp2p/p2p/host/peerstore"
 )
 
-const hostGroupName = "jumpy"
+const defaultHostGroupName = "jumpy"
 
-func Start(listenPort int) {
+func Start(listenPort int, hostGroupName string) {
 	ctx := context.Background()
 
 	//init genesis block
 	genesisBlock := chain.CreateGenesisBlock("genesis_block_data")
 	chain.Blockchain = append(chain.Blockchain, genesisBlock)
 
+	if len(hostGroupName) == 0 {
+		hostGroupName = defaultHostGroupName
+	}
 	p2p.Run(ctx, listenPort, hostGroupName)
 	select {}
 }
