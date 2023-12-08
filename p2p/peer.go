@@ -29,12 +29,12 @@ type PeerStream struct {
 	MemTransactions []chain.Transaction
 }
 
-func (ps *PeerStream) HandleStream(s net.Stream) {
+func (ps *PeerStream) handleStream(s net.Stream) {
 	rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-	go ps.ReadStream(s, rw)
+	go ps.readStream(s, rw)
 }
 
-func (ps *PeerStream) ReadStream(s net.Stream, rw *bufio.ReadWriter) {
+func (ps *PeerStream) readStream(s net.Stream, rw *bufio.ReadWriter) {
 
 	for {
 		buffer := make([]byte, defaultBufSize)
@@ -108,7 +108,7 @@ func (ps *PeerStream) ReadStream(s net.Stream, rw *bufio.ReadWriter) {
 	}
 }
 
-func (ps *PeerStream) HandleCli(rw *bufio.ReadWriter) {
+func (ps *PeerStream) handleCli(rw *bufio.ReadWriter) {
 	stdReader := bufio.NewReader(os.Stdin)
 
 	for {
@@ -181,7 +181,7 @@ func Run(ctx context.Context, listenPort int, chainGroupName string) {
 	log.Printf("my address: %s\n", peerAddr)
 
 	// connect to other peers
-	h.SetStreamHandler("/p2p/1.0.0", stream.HandleStream)
+	h.SetStreamHandler("/p2p/1.0.0", stream.handleStream)
 	log.Println("listening for connections")
 	peerChan := InitMDNS(h, chainGroupName)
 	go func(ctx context.Context, stream *PeerStream) {
@@ -198,8 +198,8 @@ func Run(ctx context.Context, listenPort int, chainGroupName string) {
 				fmt.Println("stream open failed", err)
 			} else {
 				rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-				go stream.ReadStream(s, rw)
-				go stream.HandleCli(rw)
+				go stream.readStream(s, rw)
+				go stream.handleCli(rw)
 			}
 		}
 	}(ctx, stream)
