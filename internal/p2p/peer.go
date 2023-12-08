@@ -149,7 +149,7 @@ func Run(ctx context.Context, listenPort int, chainGroupName string) {
 	// connect to other peers
 	h.SetStreamHandler("/p2p/1.0.0", stream.handleStream)
 	log.Println("listening for connections")
-	peerChan := InitMDNS(h, chainGroupName)
+	peerChan := initMDNS(h, chainGroupName)
 	go func(ctx context.Context, stream *PeerStream) {
 		for {
 			peer := <-peerChan

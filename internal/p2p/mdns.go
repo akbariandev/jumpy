@@ -15,7 +15,7 @@ func (n *discoveryNotifee) HandlePeerFound(pi peer.AddrInfo) {
 	n.PeerChan <- pi
 }
 
-func InitMDNS(peerHost host.Host, serviceName string) chan peer.AddrInfo {
+func initMDNS(peerHost host.Host, serviceName string) chan peer.AddrInfo {
 	n := &discoveryNotifee{}
 	n.PeerChan = make(chan peer.AddrInfo)
 
