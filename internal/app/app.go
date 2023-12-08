@@ -13,7 +13,7 @@ func Start(listenPort int) {
 	ctx := context.Background()
 
 	//init genesis block
-	genesisBlock := chain.CreateGenesisBlock(0, 0)
+	genesisBlock := chain.CreateGenesisBlock("genesis_block_data")
 	chain.Blockchain = append(chain.Blockchain, genesisBlock)
 
 	p2p.Run(ctx, listenPort, hostGroupName)

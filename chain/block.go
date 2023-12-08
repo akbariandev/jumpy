@@ -7,13 +7,8 @@ import (
 	"time"
 )
 
-type Position struct {
-	X int `json:"x"`
-	Y int `json:"y"`
-}
-
 type Transaction struct {
-	Position Position `json:"position"`
+	Data any `json:"data"`
 }
 
 type BlockConnection struct {
@@ -29,11 +24,11 @@ type Block struct {
 	Connections []BlockConnection
 }
 
-func CreateGenesisBlock(xPos, yPos int) Block {
+func CreateGenesisBlock(data string) Block {
 	t := time.Now()
 	genesisBlock := Block{}
 	connections := make([]BlockConnection, 2)
-	return Block{0, t.String(), []Transaction{{Position: Position{xPos, yPos}}}, genesisBlock.calculateHash(), connections}
+	return Block{0, t.String(), []Transaction{{Data: data}}, genesisBlock.calculateHash(), connections}
 }
 
 func (b Block) calculateHash() string {
@@ -47,7 +42,7 @@ func (b Block) calculateHash() string {
 func (b Block) toString() string {
 	transactionStr := ""
 	for _, t := range b.Transaction {
-		transactionStr = fmt.Sprintf("%s%s", transactionStr, t.toString())
+		transactionStr = fmt.Sprintf("%s%s", transactionStr, t.Data)
 	}
 
 	connectionStr := ""
@@ -75,8 +70,4 @@ func GenerateBlock(myID string, lastBlock *Block, targetBlockPeerID, targetBlock
 
 	newBlock.Hash = newBlock.calculateHash()
 	return newBlock
-}
-
-func (t Transaction) toString() string {
-	return fmt.Sprintf("%d,%d", t.Position.X, t.Position.Y)
 }

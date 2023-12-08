@@ -30,7 +30,7 @@ func PrintBlockChain() {
 		fmt.Println(fmt.Sprintf("Index: %d\nHash:%s", b.Index, b.Hash))
 		fmt.Printf(SuccessColor, "Transactions:\n")
 		for i, t := range b.Transaction {
-			fmt.Println(fmt.Sprintf("%d: X = %d Y = %d", i, t.Position.X, t.Position.Y))
+			fmt.Println(fmt.Sprintf("%d: = %s", i, t.Data))
 		}
 		fmt.Printf(ErrorColor, "Conenctions:\n")
 		for _, c := range b.Connections {

@@ -14,6 +14,7 @@ import (
 	net "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
+	"io"
 	"log"
 	mrand "math/rand"
 	"myBlockchain/chain"
@@ -29,65 +30,61 @@ type PeerStream struct {
 }
 
 func (ps *PeerStream) HandleStream(s net.Stream) {
-	//log.Println("connected to: ", s.)
 	rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-	go ps.ReadStream(rw)
+	go ps.ReadStream(s, rw)
 }
 
-func (ps *PeerStream) ReadStream(rw *bufio.ReadWriter) {
+func (ps *PeerStream) ReadStream(s net.Stream, rw *bufio.ReadWriter) {
 
 	for {
-		i := 0
-		b := make([]byte, 0, defaultBufSize)
-		for i < defaultBufSize {
-			bb, err := rw.ReadByte()
-			if err != nil {
-				fmt.Println(err)
-				continue
+		buffer := make([]byte, defaultBufSize)
+		n, err := s.Read(buffer)
+		if err != nil {
+			if err != io.EOF {
+				fmt.Println("Error reading from stream:", err)
 			}
-			b = append(b, bb)
-			i++
+			break
 		}
 
+		b := buffer[:n]
 		b = bytes.Trim(b, "\x00")
 		msg := &Message{}
-		err := json.Unmarshal(b, msg)
+		err = json.Unmarshal(b, msg)
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
-
 		switch msg.Topic {
 		case PullBlockTopic:
 			pullMsg := &PullBlockMessage{}
 			if err = msg.Payload.parse(pullMsg); err != nil {
+				fmt.Println(err)
 				continue
 			}
-			if pullMsg.TargetID.String() == ps.Host.ID().String() {
-				if len(pullMsg.SelfID) == 0 {
-					fmt.Println(errors.New("sender ID is empty"))
-					continue
-				}
+			if len(pullMsg.SelfID) == 0 {
+				fmt.Println(errors.New("sender ID is empty"))
+				continue
+			}
 
-				lastBlock := chain.GetLastBlock()
-				if lastBlock == nil {
-					fmt.Println(errors.New("no block founded in chain"))
-					continue
-				}
+			lastBlock := chain.GetLastBlock()
+			if lastBlock == nil {
+				fmt.Println(errors.New("no block founded in chain"))
+				continue
+			}
 
-				message := NewMessage(PushBlockTopic, PushBlockMessage{
-					SelfID:    ps.Host.ID(),
-					TargetID:  pullMsg.SelfID,
-					BlockHash: lastBlock.Hash,
-				})
-				if err = message.write(rw); err != nil {
-					log.Println(err)
-					continue
-				}
+			message := NewMessage(PushBlockTopic, PushBlockMessage{
+				SelfID:    ps.Host.ID(),
+				TargetID:  pullMsg.SelfID,
+				BlockHash: lastBlock.Hash,
+			})
+			if err = message.write(rw); err != nil {
+				log.Println(err)
+				continue
 			}
 		case PushBlockTopic:
 			pushMsg := &PushBlockMessage{}
 			if err = msg.Payload.parse(pushMsg); err != nil {
+				fmt.Println(err)
 				continue
 			}
 
@@ -104,8 +101,8 @@ func (ps *PeerStream) ReadStream(rw *bufio.ReadWriter) {
 			} else {
 				fmt.Println(errors.New("sender ID is not equal to my ID"))
 			}
-			continue
 		default:
+			fmt.Println(errors.New("undefined message"))
 			continue
 		}
 	}
@@ -128,14 +125,8 @@ func (ps *PeerStream) HandleCli(rw *bufio.ReadWriter) {
 			continue
 		}
 
-		pos := chain.Position{}
-		err = json.Unmarshal([]byte(command), &pos)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
 		ps.MemTransactions = append(ps.MemTransactions, chain.Transaction{
-			Position: pos,
+			Data: []byte(command),
 		})
 
 		randomPeerID := ps.getRandomPeer()
@@ -207,7 +198,7 @@ func Run(ctx context.Context, listenPort int, chainGroupName string) {
 				fmt.Println("stream open failed", err)
 			} else {
 				rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-				go stream.ReadStream(rw)
+				go stream.ReadStream(s, rw)
 				go stream.HandleCli(rw)
 			}
 		}
@@ -222,10 +213,20 @@ func createHost(listenPort int) (host.Host, error) {
 		return nil, err
 	}
 
+	/*connmgr, err := connmgr.NewConnManager(
+		100, // Lowwater
+		400, // HighWater,
+		connmgr.WithGracePeriod(time.Minute),
+	)
+	if err != nil {
+		panic(err)
+	}*/
+
 	sourceMultiAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", listenPort))
 	opts := []libp2p.Option{
 		libp2p.ListenAddrs(sourceMultiAddr),
 		libp2p.Identity(priv),
+		//libp2p.ConnectionManager(connmgr),
 	}
 
 	host, err := libp2p.New(opts...)
