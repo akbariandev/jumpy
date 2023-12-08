@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/akbariandev/jumpy/internal/chain"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -17,7 +18,6 @@ import (
 	"io"
 	"log"
 	mrand "math/rand"
-	"myBlockchain/internal/chain"
 	"strings"
 )
 

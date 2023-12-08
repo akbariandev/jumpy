@@ -2,9 +2,9 @@ package app
 
 import (
 	"context"
+	"github.com/akbariandev/jumpy/internal/chain"
+	"github.com/akbariandev/jumpy/internal/p2p"
 	_ "github.com/libp2p/go-libp2p/p2p/host/peerstore"
-	"myBlockchain/internal/chain"
-	"myBlockchain/internal/p2p"
 )
 
 const hostGroupName = "jumpy"

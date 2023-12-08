@@ -1,8 +1,8 @@
 package commands
 
 import (
+	"github.com/akbariandev/jumpy/internal/app"
 	"github.com/spf13/cobra"
-	"myBlockchain/internal/app"
 )
 
 func init() {

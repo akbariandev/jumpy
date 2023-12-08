@@ -1,7 +1,7 @@
 package main
 
 import (
-	"myBlockchain/cmd/commands"
+	"github.com/akbariandev/jumpy/cmd/commands"
 )
 
 func main() {

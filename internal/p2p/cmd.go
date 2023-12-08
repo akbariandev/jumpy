@@ -3,8 +3,8 @@ package p2p
 import (
 	"bufio"
 	"fmt"
+	"github.com/akbariandev/jumpy/internal/chain"
 	"log"
-	"myBlockchain/internal/chain"
 	"os"
 	"strings"
 )

@@ -1,4 +1,4 @@
-module myBlockchain
+module github.com/akbariandev/jumpy
 
 go 1.21.0
 
