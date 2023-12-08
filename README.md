@@ -3,5 +3,5 @@
 How to run:
 
 ```sh
-go run cmd/main.go run -p 10000
+go run cli/main.go run -p 10000
 ```

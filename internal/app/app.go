@@ -3,8 +3,8 @@ package app
 import (
 	"context"
 	_ "github.com/libp2p/go-libp2p/p2p/host/peerstore"
-	"myBlockchain/chain"
-	"myBlockchain/p2p"
+	"myBlockchain/internal/chain"
+	"myBlockchain/internal/p2p"
 )
 
 const hostGroupName = "jumpy"

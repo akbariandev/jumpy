@@ -17,8 +17,7 @@ import (
 	"io"
 	"log"
 	mrand "math/rand"
-	"myBlockchain/chain"
-	"os"
+	"myBlockchain/internal/chain"
 	"strings"
 )
 
@@ -108,39 +107,6 @@ func (ps *PeerStream) readStream(s net.Stream, rw *bufio.ReadWriter) {
 	}
 }
 
-func (ps *PeerStream) handleCli(rw *bufio.ReadWriter) {
-	stdReader := bufio.NewReader(os.Stdin)
-
-	for {
-		fmt.Print("> ")
-		command, err := stdReader.ReadString('\n')
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		command = strings.Replace(command, "\n", "", -1)
-
-		if command == "log" {
-			chain.PrintBlockChain()
-			continue
-		}
-
-		ps.MemTransactions = append(ps.MemTransactions, chain.Transaction{
-			Data: []byte(command),
-		})
-
-		randomPeerID := ps.getRandomPeer()
-		message := NewMessage(PullBlockTopic, PullBlockMessage{
-			SelfID:   ps.Host.ID(),
-			TargetID: randomPeerID,
-		})
-		if err = message.write(rw); err != nil {
-			log.Println(err)
-			continue
-		}
-	}
-}
-
 func (ps *PeerStream) getRandomPeer() peer.ID {
 	var randomPeer peer.ID
 	for {
@@ -199,7 +165,7 @@ func Run(ctx context.Context, listenPort int, chainGroupName string) {
 			} else {
 				rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
 				go stream.readStream(s, rw)
-				go stream.handleCli(rw)
+				go stream.readCli(rw)
 			}
 		}
 	}(ctx, stream)
@@ -234,4 +200,21 @@ func createHost(listenPort int) (host.Host, error) {
 		return nil, err
 	}
 	return host, nil
+}
+
+func addTransaction(ps *PeerStream, data any) {
+	ps.MemTransactions = append(ps.MemTransactions, chain.Transaction{
+		Data: data,
+	})
+}
+
+func commitTransaction(ps *PeerStream, rw *bufio.ReadWriter) {
+	randomPeerID := ps.getRandomPeer()
+	message := NewMessage(PullBlockTopic, PullBlockMessage{
+		SelfID:   ps.Host.ID(),
+		TargetID: randomPeerID,
+	})
+	if err := message.write(rw); err != nil {
+		fmt.Println(err)
+	}
 }
