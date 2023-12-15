@@ -17,7 +17,7 @@ const (
 	CommitTransactionsCommand Command = "commit"
 )
 
-func (ps *PeerStream) readCli(rw *bufio.ReadWriter) {
+func (ps *PeerStream) readCli() {
 	stdReader := bufio.NewReader(os.Stdin)
 
 	for {
@@ -32,22 +32,22 @@ func (ps *PeerStream) readCli(rw *bufio.ReadWriter) {
 			scmd := strings.SplitN(inp, ":", 2)
 			cmd := Command(scmd[0])
 			data := []byte(scmd[1])
-			cmd.run(ps, rw, data)
+			cmd.run(ps, data)
 		} else {
 			cmd := Command(inp)
-			cmd.run(ps, rw, nil)
+			cmd.run(ps, nil)
 		}
 	}
 }
 
-func (cmd Command) run(ps *PeerStream, rw *bufio.ReadWriter, data any) {
+func (cmd Command) run(ps *PeerStream, data any) {
 	switch cmd {
 	case LogCommand:
 		chain.PrintBlockChain()
 	case TransactionCommand:
 		addTransaction(ps, data)
 	case CommitTransactionsCommand:
-		commitTransaction(ps, rw)
+		commitTransaction(ps)
 	default:
 		fmt.Println("command not defined")
 	}

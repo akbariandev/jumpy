@@ -16,8 +16,7 @@ type Message struct {
 }
 
 type PullBlockMessage struct {
-	SelfID   peer.ID `json:"s"`
-	TargetID peer.ID `json:"t"`
+	SelfID peer.ID `json:"s"`
 }
 
 type PushBlockMessage struct {
