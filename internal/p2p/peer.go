@@ -28,6 +28,8 @@ type PeerStream struct {
 	MemTransactions []chain.Transaction
 }
 
+var connections map[string]*bufio.ReadWriter
+
 func (ps *PeerStream) handleStream(s net.Stream) {
 	rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
 	go ps.readStream(s, rw)
@@ -146,6 +148,9 @@ func Run(ctx context.Context, listenPort int, chainGroupName string) {
 	peerAddr := stream.getPeerFullAddr()
 	log.Printf("my address: %s\n", peerAddr)
 
+	connections = make(map[string]*bufio.ReadWriter)
+	go stream.readCli()
+
 	// connect to other peers
 	h.SetStreamHandler("/p2p/1.0.0", stream.handleStream)
 	log.Println("listening for connections")
@@ -165,7 +170,7 @@ func Run(ctx context.Context, listenPort int, chainGroupName string) {
 			} else {
 				rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
 				go stream.readStream(s, rw)
-				go stream.readCli(rw)
+				connections[peer.ID.String()] = rw
 			}
 		}
 	}(ctx, stream)
@@ -208,13 +213,12 @@ func addTransaction(ps *PeerStream, data any) {
 	})
 }
 
-func commitTransaction(ps *PeerStream, rw *bufio.ReadWriter) {
+func commitTransaction(ps *PeerStream) {
 	randomPeerID := ps.getRandomPeer()
 	message := NewMessage(PullBlockTopic, PullBlockMessage{
-		SelfID:   ps.Host.ID(),
-		TargetID: randomPeerID,
+		SelfID: ps.Host.ID(),
 	})
-	if err := message.write(rw); err != nil {
+	if err := message.write(connections[randomPeerID.String()]); err != nil {
 		fmt.Println(err)
 	}
 }
