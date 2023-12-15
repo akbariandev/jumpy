@@ -8,18 +8,30 @@ import (
 
 const defaultHostGroupName = "jumpy"
 
-func Start(listenPort int, hostGroupName string) {
+type Application struct {
+	nodes []*p2p.PeerStream
+}
+
+func (a *Application) ListNodes() []*p2p.PeerStream {
+	return a.nodes
+}
+
+func (a *Application) Start(nodesCount int, groupName string) {
 	ctx := context.Background()
-
-	if len(hostGroupName) == 0 {
-		hostGroupName = defaultHostGroupName
+	if len(groupName) == 0 {
+		groupName = defaultHostGroupName
 	}
 
-	ps, err := p2p.NewPeerStream(listenPort)
-	if err != nil {
-		panic(err)
+	port := 2000
+	for nodesCount > 0 {
+		ps, err := p2p.NewPeerStream(port + nodesCount)
+		if err != nil {
+			panic(err)
+		}
+		ps.Run(ctx, groupName)
+		a.nodes = append(a.nodes, ps)
+		nodesCount--
 	}
 
-	ps.Run(ctx, hostGroupName)
 	select {}
 }

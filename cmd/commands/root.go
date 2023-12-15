@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-var listenPort int
+var nodes int
 var hostGroupName string
 
 var rootCmd = &cobra.Command{
@@ -21,6 +21,6 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().IntVarP(&listenPort, "listenPort", "p", 1000, "listen Port number")
+	rootCmd.PersistentFlags().IntVarP(&nodes, "numOfNodes", "n", 2, "number of nodes to run")
 	rootCmd.PersistentFlags().StringVarP(&hostGroupName, "hostGroupname", "g", "", "name of host group")
 }

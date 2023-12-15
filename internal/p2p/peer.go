@@ -80,6 +80,15 @@ func (ps *PeerStream) Run(ctx context.Context, streamGroup string) {
 	}(ctx)
 }
 
+func (ps *PeerStream) ConnectionsIDs() []string {
+	connections := []string{}
+	for c, _ := range ps.connections {
+		connections = append(connections, c)
+	}
+
+	return connections
+}
+
 func (ps *PeerStream) handleStream(s net.Stream) {
 	rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
 	go ps.readStream(s, rw)

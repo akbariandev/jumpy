@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"github.com/akbariandev/jumpy/internal/app"
 	"github.com/spf13/cobra"
 )
 
@@ -14,6 +13,6 @@ var runCmd = &cobra.Command{
 	Short: "Run a DAG Node",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		app.Start(listenPort, hostGroupName)
+		//app.Start(nodes, hostGroupName)
 	},
 }
