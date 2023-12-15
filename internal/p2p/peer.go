@@ -25,20 +25,59 @@ const defaultBufSize = 4096
 
 type PeerStream struct {
 	Host            host.Host
-	MemTransactions []chain.Transaction
+	memTransactions []chain.Transaction
+	connections     map[string]*bufio.ReadWriter
+	chain           chain.Chain
 }
 
-var connections map[string]*bufio.ReadWriter
-
-func NewPeerStream(listenPort int) *PeerStream {
+func NewPeerStream(listenPort int) (*PeerStream, error) {
 	h, err := createHost(listenPort)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	memTransactions := make([]chain.Transaction, 0)
-	connections = make(map[string]*bufio.ReadWriter)
 
-	return &PeerStream{Host: h, MemTransactions: memTransactions}
+	ps := &PeerStream{
+		Host:            h,
+		memTransactions: make([]chain.Transaction, 0),
+		connections:     make(map[string]*bufio.ReadWriter),
+		chain:           chain.Chain{},
+	}
+
+	//initialize genesis block
+	genesisBlock := chain.CreateGenesisBlock("genesis_block_data")
+	ps.chain = append(ps.chain, genesisBlock)
+
+	return ps, nil
+}
+
+func (ps *PeerStream) Run(ctx context.Context, streamGroup string) {
+	peerAddr := ps.getPeerFullAddr()
+	log.Printf("my address: %s\n", peerAddr)
+	go ps.readCli()
+
+	// connect to other peers
+	ps.Host.SetStreamHandler("/p2p/1.0.0", ps.handleStream)
+	log.Println("listening for connections")
+	peerChan := initMDNS(ps.Host, streamGroup)
+	go func(ctx context.Context) {
+		for {
+			peer := <-peerChan
+			if err := ps.Host.Connect(ctx, peer); err != nil {
+				fmt.Println("connection failed:", err)
+				continue
+			}
+
+			fmt.Println("connected to: ", peer)
+			s, err := ps.Host.NewStream(ctx, peer.ID, "/p2p/1.0.0")
+			if err != nil {
+				fmt.Println("stream open failed", err)
+			} else {
+				rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+				go ps.readStream(s, rw)
+				ps.connections[peer.ID.String()] = rw
+			}
+		}
+	}(ctx)
 }
 
 func (ps *PeerStream) handleStream(s net.Stream) {
@@ -78,7 +117,7 @@ func (ps *PeerStream) readStream(s net.Stream, rw *bufio.ReadWriter) {
 				continue
 			}
 
-			lastBlock := chain.GetLastBlock()
+			lastBlock := ps.chain.GetLastBlock()
 			if lastBlock == nil {
 				fmt.Println(errors.New("no block founded in chain"))
 				continue
@@ -100,16 +139,16 @@ func (ps *PeerStream) readStream(s net.Stream, rw *bufio.ReadWriter) {
 				continue
 			}
 
-			lastBlock := chain.GetLastBlock()
+			lastBlock := ps.chain.GetLastBlock()
 			if len(pushMsg.SelfID.String()) == 0 {
 				fmt.Println(errors.New("sender ID is empty"))
 				continue
 			}
 
 			if pushMsg.TargetID.String() == ps.Host.ID().String() {
-				block := chain.GenerateBlock(ps.Host.ID().String(), lastBlock, pushMsg.TargetID.String(), pushMsg.BlockHash, ps.MemTransactions)
-				chain.Blockchain = append(chain.Blockchain, block)
-				ps.MemTransactions = make([]chain.Transaction, 0)
+				block := chain.GenerateBlock(ps.Host.ID().String(), lastBlock, pushMsg.TargetID.String(), pushMsg.BlockHash, ps.memTransactions)
+				ps.chain = append(ps.chain, block)
+				ps.memTransactions = make([]chain.Transaction, 0)
 			} else {
 				fmt.Println(errors.New("sender ID is not equal to my ID"))
 			}
@@ -149,36 +188,6 @@ func (ps *PeerStream) getPeerFullAddr() ma.Multiaddr {
 	return addr.Encapsulate(hostAddr)
 }
 
-func (ps *PeerStream) Run(ctx context.Context, streamGroup string) {
-	peerAddr := ps.getPeerFullAddr()
-	log.Printf("my address: %s\n", peerAddr)
-	go ps.readCli()
-
-	// connect to other peers
-	ps.Host.SetStreamHandler("/p2p/1.0.0", ps.handleStream)
-	log.Println("listening for connections")
-	peerChan := initMDNS(ps.Host, streamGroup)
-	go func(ctx context.Context, ps *PeerStream) {
-		for {
-			peer := <-peerChan
-			if err := ps.Host.Connect(ctx, peer); err != nil {
-				fmt.Println("connection failed:", err)
-				continue
-			}
-
-			fmt.Println("connected to: ", peer)
-			s, err := ps.Host.NewStream(ctx, peer.ID, "/p2p/1.0.0")
-			if err != nil {
-				fmt.Println("stream open failed", err)
-			} else {
-				rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-				go ps.readStream(s, rw)
-				connections[peer.ID.String()] = rw
-			}
-		}
-	}(ctx, ps)
-}
-
 func createHost(listenPort int) (host.Host, error) {
 
 	r := rand.Reader
@@ -201,17 +210,24 @@ func createHost(listenPort int) (host.Host, error) {
 }
 
 func addTransaction(ps *PeerStream, data any) {
-	ps.MemTransactions = append(ps.MemTransactions, chain.Transaction{
+	ps.memTransactions = append(ps.memTransactions, chain.Transaction{
 		Data: data,
 	})
 }
 
-func commitTransaction(ps *PeerStream) {
+func commitTransaction(ps *PeerStream) error {
 	randomPeerID := ps.getRandomPeer()
 	message := NewMessage(PullBlockTopic, PullBlockMessage{
 		SelfID: ps.Host.ID(),
 	})
-	if err := message.write(connections[randomPeerID.String()]); err != nil {
-		fmt.Println(err)
+
+	if len(ps.connections) == 0 {
+		return errors.New("no peers connected")
 	}
+
+	if err := message.write(ps.connections[randomPeerID.String()]); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -14,18 +14,18 @@ const (
 	DebugColor   = "\033[0;36m%s\033[0m"
 )
 
-var Blockchain []Block
+type Chain []Block
 
-func GetLastBlock() *Block {
-	return &Blockchain[len(Blockchain)-1]
+func (c Chain) GetLastBlock() *Block {
+	return &c[len(c)-1]
 }
 
-func GetRandomBlock() *Block {
-	return &Blockchain[mrand.Intn(len(Blockchain))]
+func (c Chain) GetRandomBlock() *Block {
+	return &c[mrand.Intn(len(c))]
 }
 
-func PrintBlockChain() {
-	for _, b := range Blockchain {
+func (c Chain) PrintBlockChain() {
+	for _, b := range c {
 		fmt.Println("-----------------------------------------------------------------------")
 		fmt.Println(fmt.Sprintf("Index: %d\nHash:%s", b.Index, b.Hash))
 		fmt.Printf(SuccessColor, "Transactions:\n")
@@ -39,4 +39,8 @@ func PrintBlockChain() {
 			fmt.Println(fmt.Sprintf("Block = %s", c.BlockHash))
 		}
 	}
+}
+
+func (c Chain) ExportGephi() {
+
 }

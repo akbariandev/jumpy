@@ -3,7 +3,6 @@ package p2p
 import (
 	"bufio"
 	"fmt"
-	"github.com/akbariandev/jumpy/internal/chain"
 	"log"
 	"os"
 	"strings"
@@ -43,11 +42,13 @@ func (ps *PeerStream) readCli() {
 func (cmd Command) run(ps *PeerStream, data any) {
 	switch cmd {
 	case LogCommand:
-		chain.PrintBlockChain()
+		ps.chain.PrintBlockChain()
 	case TransactionCommand:
 		addTransaction(ps, data)
 	case CommitTransactionsCommand:
-		commitTransaction(ps)
+		if err := commitTransaction(ps); err != nil {
+			fmt.Println(err)
+		}
 	default:
 		fmt.Println("command not defined")
 	}
