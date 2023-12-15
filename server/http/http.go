@@ -13,7 +13,23 @@ func Run() {
 	api := router.Group("/api")
 	{
 		api.GET("/run", func(c *gin.Context) {
-			app.Start(2010, "")
+			nodeCount := 1
+			nodes, ok := c.Get("nodes")
+			if ok {
+				nodeCount, _ = nodes.(int)
+			}
+
+			groupName, _ := c.Get("group")
+
+			i := 0
+			port := 3000
+			for i < nodeCount {
+				go app.Start(port+i, groupName.(string))
+				i++
+			}
+
+			c.Status(200)
+			c.Next()
 		})
 	}
 
