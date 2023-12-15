@@ -30,6 +30,17 @@ type PeerStream struct {
 
 var connections map[string]*bufio.ReadWriter
 
+func NewPeerStream(listenPort int) *PeerStream {
+	h, err := createHost(listenPort)
+	if err != nil {
+		log.Fatal(err)
+	}
+	memTransactions := make([]chain.Transaction, 0)
+	connections = make(map[string]*bufio.ReadWriter)
+
+	return &PeerStream{Host: h, MemTransactions: memTransactions}
+}
+
 func (ps *PeerStream) handleStream(s net.Stream) {
 	rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
 	go ps.readStream(s, rw)
@@ -138,42 +149,34 @@ func (ps *PeerStream) getPeerFullAddr() ma.Multiaddr {
 	return addr.Encapsulate(hostAddr)
 }
 
-func Run(ctx context.Context, listenPort int, chainGroupName string) {
-	h, err := createHost(listenPort)
-	if err != nil {
-		log.Fatal(err)
-	}
-	memTransactions := make([]chain.Transaction, 0)
-	stream := &PeerStream{Host: h, MemTransactions: memTransactions}
-	peerAddr := stream.getPeerFullAddr()
+func (ps *PeerStream) Run(ctx context.Context, streamGroup string) {
+	peerAddr := ps.getPeerFullAddr()
 	log.Printf("my address: %s\n", peerAddr)
-
-	connections = make(map[string]*bufio.ReadWriter)
-	go stream.readCli()
+	go ps.readCli()
 
 	// connect to other peers
-	h.SetStreamHandler("/p2p/1.0.0", stream.handleStream)
+	ps.Host.SetStreamHandler("/p2p/1.0.0", ps.handleStream)
 	log.Println("listening for connections")
-	peerChan := initMDNS(h, chainGroupName)
-	go func(ctx context.Context, stream *PeerStream) {
+	peerChan := initMDNS(ps.Host, streamGroup)
+	go func(ctx context.Context, ps *PeerStream) {
 		for {
 			peer := <-peerChan
-			if err := stream.Host.Connect(ctx, peer); err != nil {
+			if err := ps.Host.Connect(ctx, peer); err != nil {
 				fmt.Println("connection failed:", err)
 				continue
 			}
 
 			fmt.Println("connected to: ", peer)
-			s, err := stream.Host.NewStream(ctx, peer.ID, "/p2p/1.0.0")
+			s, err := ps.Host.NewStream(ctx, peer.ID, "/p2p/1.0.0")
 			if err != nil {
 				fmt.Println("stream open failed", err)
 			} else {
 				rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-				go stream.readStream(s, rw)
+				go ps.readStream(s, rw)
 				connections[peer.ID.String()] = rw
 			}
 		}
-	}(ctx, stream)
+	}(ctx, ps)
 }
 
 func createHost(listenPort int) (host.Host, error) {
@@ -184,20 +187,10 @@ func createHost(listenPort int) (host.Host, error) {
 		return nil, err
 	}
 
-	/*connmgr, err := connmgr.NewConnManager(
-		100, // Lowwater
-		400, // HighWater,
-		connmgr.WithGracePeriod(time.Minute),
-	)
-	if err != nil {
-		panic(err)
-	}*/
-
 	sourceMultiAddr, _ := ma.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", listenPort))
 	opts := []libp2p.Option{
 		libp2p.ListenAddrs(sourceMultiAddr),
 		libp2p.Identity(priv),
-		//libp2p.ConnectionManager(connmgr),
 	}
 
 	host, err := libp2p.New(opts...)

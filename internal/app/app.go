@@ -19,6 +19,8 @@ func Start(listenPort int, hostGroupName string) {
 	if len(hostGroupName) == 0 {
 		hostGroupName = defaultHostGroupName
 	}
-	p2p.Run(ctx, listenPort, hostGroupName)
+
+	ps := p2p.NewPeerStream(listenPort)
+	ps.Run(ctx, hostGroupName)
 	select {}
 }
