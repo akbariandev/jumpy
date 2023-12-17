@@ -29,9 +29,10 @@ type PeerStream struct {
 	memTransactions []chain.Transaction
 	memBlock        []*chain.Block
 	chain           chain.Chain
+	approveFunction func(block *chain.Block) bool
 }
 
-func NewPeerStream(listenPort int) (*PeerStream, error) {
+func NewPeerStream(listenPort int, approveFunc func(block *chain.Block) bool) (*PeerStream, error) {
 	h, err := createHost(listenPort)
 	if err != nil {
 		return nil, err
@@ -43,6 +44,7 @@ func NewPeerStream(listenPort int) (*PeerStream, error) {
 		connections:     make(map[string]*bufio.ReadWriter),
 		memBlock:        make([]*chain.Block, 0),
 		chain:           chain.Chain{},
+		approveFunction: approveFunc,
 	}
 
 	//initialize genesis block
@@ -95,23 +97,18 @@ func (ps *PeerStream) ConnectionsIDs() []string {
 }
 
 func (ps *PeerStream) CommitTransaction() error {
-	randomPeerID := ps.getRandomPeer()
-	if len(ps.connections) == 0 {
-		return errors.New("no peers connected")
-	}
-
 	//generating memo block
 	lastBlock := ps.chain.GetLastBlock()
 	memBlock := chain.GenerateMemoBlock(ps.Host.ID().String(), lastBlock, ps.memTransactions)
 	ps.memBlock = append(ps.memBlock, memBlock)
 	ps.memTransactions = make([]chain.Transaction, 0)
 
-	// create message and send to target peer
-	message := NewMessage(PullBlockTopic, PullBlockMessage{})
-	if err := message.write(ps.connections[randomPeerID.String()]); err != nil {
+	//send request approval message
+	committee := ps.ConnectionsIDs()
+	message := NewMessage(RequestApprovalTopic, RequestApprovalMessage{Block: memBlock, Committee: committee})
+	if err := message.write(ps.connections[committee[0]]); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -126,7 +123,6 @@ func (ps *PeerStream) GetChain() chain.Chain {
 }
 
 func (ps *PeerStream) handleStream(s net.Stream) {
-	//rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
 	go ps.readStream(s)
 }
 
@@ -143,16 +139,16 @@ func (ps *PeerStream) readStream(s net.Stream) {
 		}
 		b := buffer[:n]
 		b = bytes.Trim(b, "\x00")
-		msg := &Message{}
-		err = json.Unmarshal(b, msg)
+		m := &Message{}
+		err = json.Unmarshal(b, m)
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
-		switch msg.Topic {
-		case PullBlockTopic:
-			pullMsg := &PullBlockMessage{}
-			if err = msg.Payload.parse(pullMsg); err != nil {
+		switch m.Topic {
+		case RequestTipBlockTopic:
+			msg := &RequestTipBlockMessage{}
+			if err = m.Payload.parse(msg); err != nil {
 				fmt.Println(err)
 				continue
 			}
@@ -166,7 +162,7 @@ func (ps *PeerStream) readStream(s net.Stream) {
 				fmt.Println(errors.New("no block founded in chain"))
 				continue
 			}
-			message := NewMessage(PushBlockTopic, PushBlockMessage{
+			message := NewMessage(ResponseTipBlockTopic, ResponseTipBlockMessage{
 				BlockHash: lastBlock.Hash,
 			})
 
@@ -174,9 +170,9 @@ func (ps *PeerStream) readStream(s net.Stream) {
 				log.Println(err)
 				continue
 			}
-		case PushBlockTopic:
-			pushMsg := &PushBlockMessage{}
-			if err = msg.Payload.parse(pushMsg); err != nil {
+		case ResponseTipBlockTopic:
+			msg := &ResponseTipBlockMessage{}
+			if err = m.Payload.parse(msg); err != nil {
 				fmt.Println(err)
 				continue
 			}
@@ -192,9 +188,63 @@ func (ps *PeerStream) readStream(s net.Stream) {
 			}
 
 			block := ps.memBlock[0]
-			block.Connections = append(block.Connections, chain.BlockConnection{PeerID: remotePeer, BlockHash: pushMsg.BlockHash})
+			block.Connections = append(block.Connections, chain.BlockConnection{PeerID: remotePeer, BlockHash: msg.BlockHash})
 			ps.chain = append(ps.chain, *block)
 			ps.memBlock = ps.memBlock[1:]
+		case RequestApprovalTopic:
+			msg := &RequestApprovalMessage{}
+			if err = m.Payload.parse(msg); err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			resp := ResponseApprovalMessage{BlockHash: msg.Block.Hash, Committee: msg.Committee}
+			resp.IsApproved = ps.approveFunction(msg.Block)
+			message := NewMessage(ResponseApprovalTopic, resp)
+			if err = message.write(ps.connections[s.Conn().RemotePeer().String()]); err != nil {
+				log.Println(err)
+				continue
+			}
+		case ResponseApprovalTopic:
+			msg := &ResponseApprovalMessage{}
+			if err = m.Payload.parse(msg); err != nil {
+				fmt.Println(err)
+				continue
+			}
+			if !msg.IsApproved {
+				//failed approval
+				//TODO: remove memBlock
+				continue
+			}
+
+			msg.Committee = removePeerInCommittee(msg.Committee, s.Conn().RemotePeer().String())
+			if len(msg.Committee) == 0 {
+				//go for getting tip block
+				randomPeerID := ps.getRandomPeer()
+				if len(ps.connections) == 0 {
+					//TODO: handle err
+					continue
+				}
+
+				// create message and send to target peer
+				message := NewMessage(RequestTipBlockTopic, RequestTipBlockMessage{})
+				if err := message.write(ps.connections[randomPeerID.String()]); err != nil {
+					//TODO: handle err
+					continue
+				}
+				continue
+			}
+
+			memBlock := ps.getMemBlockByHash(msg.BlockHash)
+			if memBlock == nil {
+				//TODO: handle err
+				continue
+			}
+			message := NewMessage(RequestApprovalTopic, RequestApprovalMessage{Block: memBlock, Committee: msg.Committee})
+			if err := message.write(ps.connections[msg.Committee[0]]); err != nil {
+				//TODO: handle err
+				continue
+			}
 		default:
 			fmt.Println(errors.New("undefined message"))
 			continue
@@ -250,4 +300,24 @@ func createHost(listenPort int) (host.Host, error) {
 		return nil, err
 	}
 	return host, nil
+}
+
+func removePeerInCommittee(in []string, peer string) (out []string) {
+	for _, c := range in {
+		if peer != c {
+			out = append(out, c)
+		}
+	}
+
+	return out
+}
+
+func (ps *PeerStream) getMemBlockByHash(hash string) *chain.Block {
+	for _, b := range ps.memBlock {
+		if b.Hash == hash {
+			return b
+		}
+	}
+
+	return nil
 }

@@ -4,26 +4,40 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"github.com/akbariandev/jumpy/internal/chain"
 )
 
 type MessageTopic string
 type MessagePayload []byte
 
+const (
+	RequestTipBlockTopic  MessageTopic = "request_tip_block"
+	ResponseTipBlockTopic MessageTopic = "response_tip_block"
+	RequestApprovalTopic  MessageTopic = "request_approve_block"
+	ResponseApprovalTopic MessageTopic = "response_approve_block"
+)
+
 type Message struct {
-	Topic   MessageTopic   `json:"topic"`
-	Payload MessagePayload `json:"payload"`
+	Topic   MessageTopic   `json:"t"`
+	Payload MessagePayload `json:"p"`
 }
 
-type PullBlockMessage struct{}
+type RequestTipBlockMessage struct{}
 
-type PushBlockMessage struct {
+type ResponseTipBlockMessage struct {
 	BlockHash string `json:"b"`
 }
 
-const (
-	PullBlockTopic MessageTopic = "pull_block"
-	PushBlockTopic MessageTopic = "push_block"
-)
+type RequestApprovalMessage struct {
+	Block     *chain.Block `json:"b"`
+	Committee []string     `json:"c"`
+}
+
+type ResponseApprovalMessage struct {
+	BlockHash  string   `json:"h"`
+	IsApproved bool     `json:"a"`
+	Committee  []string `json:"c"`
+}
 
 func NewMessage(topic MessageTopic, payload any) *Message {
 	pByte, err := json.Marshal(payload)
