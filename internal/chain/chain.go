@@ -25,6 +25,16 @@ func (c Chain) GetBlockAtIndex(index int) *Block {
 	return &c[index]
 }
 
+func (c Chain) GetBlockByHash(hash string) *Block {
+	for _, b := range c {
+		if b.Hash == hash {
+			return &b
+		}
+	}
+
+	return nil
+}
+
 func (c Chain) GetRandomBlock() *Block {
 	return &c[mrand.Intn(len(c))]
 }

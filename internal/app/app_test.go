@@ -5,7 +5,47 @@ import (
 	"time"
 )
 
-func TestApplication_Start(t *testing.T) {
+func TestApplication_SingleCommit(t *testing.T) {
+	testData := "data1"
+	app := &Application{}
+	t.Log("App Started!")
+	go app.Start(3, "")
+
+	time.Sleep(2 * time.Second)
+	if len(app.nodes) != 3 {
+		t.Failed()
+	}
+
+	//commit some transaction
+	node0 := app.nodes[0]
+	node0.AddTransaction(testData)
+	if err := node0.CommitTransaction(); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(3 * time.Second)
+
+	node0Chain := node0.GetChain()
+	//check chain height
+	if node0Chain.GetHeight() != 2 {
+		t.Fatalf("expected %d got %d", 2, node0Chain.GetHeight())
+	}
+
+	//check blocks healthy
+	node0B1Data := node0Chain.GetBlockAtIndex(1).Transaction[0].Data
+	if node0B1Data != testData {
+		t.Fatalf("expected %s got %s", testData, node0B1Data)
+	}
+
+	//check block connections
+	if node0Chain.GetBlockAtIndex(1).Connections[0].PeerID != node0.Host.ID().String() {
+		t.Fatalf("expected %s got %s", node0.Host.ID().String(), node0Chain.GetBlockAtIndex(1).Connections[0].PeerID)
+	}
+	if node0Chain.GetBlockAtIndex(1).Connections[1].PeerID == node0.Host.ID().String() {
+		t.Fatalf("peer ID is equal to self ID")
+	}
+}
+
+func TestApplication_MultiCommit(t *testing.T) {
 	testData := []string{"data1", "data2", "data3", "data4"}
 	app := &Application{}
 	t.Log("App Started!")
@@ -24,7 +64,7 @@ func TestApplication_Start(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	time.Sleep(2 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	node0Chain := node0.GetChain()
 	//check chain height
