@@ -15,7 +15,7 @@ export default {
     methods: {
         runApplication(event) {
             //var loginData = {phone: this.phoneNumber, password: this.password, pageCode: localStorage.getItem('page_code')}
-            axios({ method: "GET", url: import.meta.env.SERVERURL+"/run?nodes=2&group=krypton", withCredentials: false, headers: {"content-type": "application/json" } }).then(result => {
+            axios({ method: "GET", url: "http://localhost:5000/api/run?nodes=2&group=krypton", withCredentials: true, headers: {"content-type": "application/json" } }).then(result => {
 
             }).catch( error => {
 

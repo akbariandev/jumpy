@@ -24,9 +24,11 @@ func Run() {
 	api := router.Group("/api")
 	{
 		api.GET("/run", func(c *gin.Context) {
+
 			nodes := c.Query("nodes")
 			groupName := c.Query("group")
 			nodesCount, _ := strconv.Atoi(nodes)
+			nodeApp = new(app.Application)
 			go nodeApp.Start(nodesCount, groupName)
 			c.Status(200)
 			c.Next()
@@ -45,5 +47,23 @@ func Run() {
 		})
 	}
 
+	router.Use(CORSMiddleware())
 	router.Run(":5000")
+}
+
+func CORSMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Credentials", "true")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Header("Access-Control-Allow-Methods", "POST,HEAD,PATCH, OPTIONS, GET, PUT")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	}
 }
