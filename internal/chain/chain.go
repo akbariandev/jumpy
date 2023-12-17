@@ -17,7 +17,12 @@ const (
 type Chain []Block
 
 func (c Chain) GetLastBlock() *Block {
-	return &c[len(c)-1]
+	i := len(c) - 1
+	return &c[i]
+}
+
+func (c Chain) GetBlockAtIndex(index int) *Block {
+	return &c[index]
 }
 
 func (c Chain) GetRandomBlock() *Block {
@@ -41,6 +46,6 @@ func (c Chain) PrintBlockChain() {
 	}
 }
 
-func (c Chain) ExportGephi() {
-
+func (c Chain) GetHeight() int {
+	return len(c)
 }

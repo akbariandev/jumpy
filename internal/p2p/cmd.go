@@ -44,9 +44,9 @@ func (cmd Command) run(ps *PeerStream, data any) {
 	case LogCommand:
 		ps.chain.PrintBlockChain()
 	case TransactionCommand:
-		addTransaction(ps, data)
+		ps.AddTransaction(data)
 	case CommitTransactionsCommand:
-		if err := commitTransaction(ps); err != nil {
+		if err := ps.CommitTransaction(); err != nil {
 			fmt.Println(err)
 		}
 	default:

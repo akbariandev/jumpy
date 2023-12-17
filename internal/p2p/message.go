@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
-	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 type MessageTopic string
@@ -15,14 +14,10 @@ type Message struct {
 	Payload MessagePayload `json:"payload"`
 }
 
-type PullBlockMessage struct {
-	SelfID peer.ID `json:"s"`
-}
+type PullBlockMessage struct{}
 
 type PushBlockMessage struct {
-	BlockHash string  `json:"b"`
-	SelfID    peer.ID `json:"s"`
-	TargetID  peer.ID `json:"t"`
+	BlockHash string `json:"b"`
 }
 
 const (

@@ -5,11 +5,11 @@ import (
 	"os"
 )
 
-var listenPort int
+var nodes int
 var hostGroupName string
 
 var rootCmd = &cobra.Command{
-	Use:   "ChainOfBots",
+	Use:   "Jumpy",
 	Short: "",
 }
 
@@ -21,6 +21,6 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().IntVarP(&listenPort, "listenPort", "p", 1000, "listen Port number")
-	rootCmd.PersistentFlags().StringVarP(&hostGroupName, "hostGroupname", "g", "", "name of host group")
+	rootCmd.PersistentFlags().IntVarP(&nodes, "NumberOfNodes", "n", 2, "number of nodes to run")
+	rootCmd.PersistentFlags().StringVarP(&hostGroupName, "HostGroupname", "g", "", "name of host group")
 }
