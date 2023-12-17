@@ -49,7 +49,6 @@ func (c Chain) PrintBlockChain() {
 		}
 		fmt.Printf(ErrorColor, "Conenctions:\n")
 		for _, c := range b.Connections {
-			fmt.Println()
 			fmt.Println(fmt.Sprintf("Node = %s", c.PeerID))
 			fmt.Println(fmt.Sprintf("Block = %s", c.BlockHash))
 		}

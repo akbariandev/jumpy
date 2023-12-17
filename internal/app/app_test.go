@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TestApplication_SingleCommit(t *testing.T) {
+func TestApplication_SingleCommitOnSingleNode(t *testing.T) {
 	testData := "data1"
 	app := &Application{}
 	t.Log("App Started!")
@@ -45,7 +45,7 @@ func TestApplication_SingleCommit(t *testing.T) {
 	}
 }
 
-func TestApplication_MultiCommit(t *testing.T) {
+func TestApplication_MultiCommitOnSingleNode(t *testing.T) {
 	testData := []string{"data1", "data2", "data3", "data4"}
 	app := &Application{}
 	t.Log("App Started!")
@@ -57,44 +57,84 @@ func TestApplication_MultiCommit(t *testing.T) {
 	}
 
 	//commit some transaction
-	node0 := app.nodes[0]
+	n := app.nodes[0]
 	for _, d := range testData {
-		node0.AddTransaction(d)
-		if err := node0.CommitTransaction(); err != nil {
+		n.AddTransaction(d)
+		if err := n.CommitTransaction(); err != nil {
 			t.Fatal(err)
 		}
 	}
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
 
-	node0Chain := node0.GetChain()
+	c := n.GetChain()
 	//check chain height
-	if node0Chain.GetHeight() != 5 {
-		t.Fatalf("expected %d got %d", 5, node0Chain.GetHeight())
+	if c.GetHeight() != 5 {
+		t.Fatalf("expected %d got %d", 5, c.GetHeight())
 	}
 
 	//check blocks healthy
-	node0B1Data := node0Chain.GetBlockAtIndex(1).Transaction[0].Data
-	if node0B1Data != testData[0] {
-		t.Fatalf("expected %s got %s", testData[0], node0B1Data)
+	for i, tt := range testData {
+		b := c.GetBlockAtIndex(i + 1) // 0 == genesis
+		d := b.Transaction[0].Data
+		if d != tt {
+			t.Fatalf("expected %s got %s", tt, d)
+		}
+		if b.Connections[0].PeerID != n.Host.ID().String() {
+			t.Fatalf("expected %s got %s", n.Host.ID().String(), b.Connections[0].PeerID)
+		}
+		if b.Connections[1].PeerID == n.Host.ID().String() {
+			t.Fatalf("peer ID is equal to self ID")
+		}
 	}
-	node0B2Data := node0Chain.GetBlockAtIndex(2).Transaction[0].Data
-	if node0B2Data != testData[1] {
-		t.Fatalf("expected %s got %s", testData[1], node0B2Data)
-	}
-	node0B3Data := node0Chain.GetBlockAtIndex(3).Transaction[0].Data
-	if node0B3Data != testData[2] {
-		t.Fatalf("expected %s got %s", testData[2], node0B3Data)
-	}
-	node0B4Data := node0Chain.GetBlockAtIndex(4).Transaction[0].Data
-	if node0B4Data != testData[3] {
-		t.Fatalf("expected %s got %s", testData[3], node0B4Data)
+}
+
+func TestApplication_MultiCommitOnMultiNode(t *testing.T) {
+	testData := []string{"data1", "data2", "data3", "data4"}
+	app := &Application{}
+	t.Log("App Started!")
+	numOfNodes := 5
+	go app.Start(numOfNodes, "")
+
+	time.Sleep(2 * time.Second)
+	if len(app.nodes) != numOfNodes {
+		t.Failed()
 	}
 
-	//check block connections
-	if node0Chain.GetBlockAtIndex(1).Connections[0].PeerID != node0.Host.ID().String() {
-		t.Fatalf("expected %s got %s", node0.Host.ID().String(), node0Chain.GetBlockAtIndex(1).Connections[0].PeerID)
+	//commit some transaction
+	t.Parallel()
+	for numOfNodes > 0 {
+		n := app.nodes[numOfNodes-1]
+		for _, d := range testData {
+			n.AddTransaction(d)
+			if err := n.CommitTransaction(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		time.Sleep(10 * time.Second)
+
+		c := n.GetChain()
+		//check chain height
+		if c.GetHeight() != 5 {
+			t.Fatalf("expected %d got %d", 5, c.GetHeight())
+		}
+
+		//check blocks healthy
+		for i, tt := range testData {
+			b := c.GetBlockAtIndex(i + 1) // 0 == genesis
+			d := b.Transaction[0].Data
+			if d != tt {
+				t.Fatalf("expected %s got %s", tt, d)
+			}
+			if b.Connections[0].PeerID != n.Host.ID().String() {
+				t.Fatalf("expected %s got %s", n.Host.ID().String(), b.Connections[0].PeerID)
+			}
+			if b.Connections[1].PeerID == n.Host.ID().String() {
+				t.Fatalf("peer ID is equal to self ID")
+			}
+		}
+
+		numOfNodes--
+		go n.GetChain().PrintBlockChain()
 	}
-	if node0Chain.GetBlockAtIndex(1).Connections[1].PeerID == node0.Host.ID().String() {
-		t.Fatalf("peer ID is equal to self ID")
-	}
+
 }
