@@ -25,8 +25,9 @@ const defaultBufSize = 4096
 
 type PeerStream struct {
 	Host            host.Host
-	memTransactions []chain.Transaction
 	connections     map[string]*bufio.ReadWriter
+	memTransactions []chain.Transaction
+	memBlock        []*chain.Block
 	chain           chain.Chain
 }
 
@@ -40,6 +41,7 @@ func NewPeerStream(listenPort int) (*PeerStream, error) {
 		Host:            h,
 		memTransactions: make([]chain.Transaction, 0),
 		connections:     make(map[string]*bufio.ReadWriter),
+		memBlock:        make([]*chain.Block, 0),
 		chain:           chain.Chain{},
 	}
 
@@ -94,12 +96,18 @@ func (ps *PeerStream) ConnectionsIDs() []string {
 
 func (ps *PeerStream) CommitTransaction() error {
 	randomPeerID := ps.getRandomPeer()
-	message := NewMessage(PullBlockTopic, PullBlockMessage{})
-
 	if len(ps.connections) == 0 {
 		return errors.New("no peers connected")
 	}
 
+	//generating memo block
+	lastBlock := ps.chain.GetLastBlock()
+	memBlock := chain.GenerateMemoBlock(ps.Host.ID().String(), lastBlock, ps.memTransactions)
+	ps.memBlock = append(ps.memBlock, memBlock)
+	ps.memTransactions = make([]chain.Transaction, 0)
+
+	// create message and send to target peer
+	message := NewMessage(PullBlockTopic, PullBlockMessage{})
 	if err := message.write(ps.connections[randomPeerID.String()]); err != nil {
 		return err
 	}
@@ -149,7 +157,7 @@ func (ps *PeerStream) readStream(s net.Stream) {
 				continue
 			}
 			if len(s.Conn().RemotePeer()) == 0 || ps.connections[s.Conn().RemotePeer().String()] == nil {
-				fmt.Println(errors.New("sender ID is empty"))
+				fmt.Println(errors.New("sender ID is invalid"))
 				continue
 			}
 
@@ -173,17 +181,20 @@ func (ps *PeerStream) readStream(s net.Stream) {
 				continue
 			}
 
-			lastBlock := ps.chain.GetLastBlock()
 			remotePeer := s.Conn().RemotePeer().String()
 			if len(remotePeer) == 0 {
 				fmt.Println(errors.New("sender ID is empty"))
 				continue
 			}
+			if len(ps.memBlock) == 0 {
+				fmt.Println(errors.New("no memo block to commit"))
+				continue
+			}
 
-			block := chain.GenerateBlock(ps.Host.ID().String(), lastBlock, remotePeer, pushMsg.BlockHash, ps.memTransactions)
-			ps.chain = append(ps.chain, block)
-			ps.memTransactions = make([]chain.Transaction, 0)
-
+			block := ps.memBlock[0]
+			block.Connections = append(block.Connections, chain.BlockConnection{PeerID: remotePeer, BlockHash: pushMsg.BlockHash})
+			ps.chain = append(ps.chain, *block)
+			ps.memBlock = ps.memBlock[1:]
 		default:
 			fmt.Println(errors.New("undefined message"))
 			continue

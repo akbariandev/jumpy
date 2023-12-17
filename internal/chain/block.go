@@ -54,16 +54,32 @@ func (b Block) toString() string {
 }
 
 // GenerateBlock will create a new block using previous block's hash
-func GenerateBlock(myID string, lastBlock *Block, targetBlockPeerID, targetBlockHash string, transaction []Transaction) Block {
+func GenerateBlock(localPeerID string, lastBlock *Block, targetBlockPeerID, targetBlockHash string, transaction []Transaction) Block {
 
 	var newBlock Block
 
 	newBlock.Index = lastBlock.Index + 1
 	newBlock.Transaction = transaction
-	//add last block hash to connections
 	connections := make([]BlockConnection, 0)
-	connections = append(connections, BlockConnection{PeerID: myID, BlockHash: lastBlock.Hash})
+	connections = append(connections, BlockConnection{PeerID: localPeerID, BlockHash: lastBlock.Hash})
 	connections = append(connections, BlockConnection{PeerID: targetBlockPeerID, BlockHash: targetBlockHash})
+	newBlock.Connections = connections
+	t := time.Now()
+	newBlock.Timestamp = t.String()
+
+	newBlock.Hash = newBlock.calculateHash()
+	return newBlock
+}
+
+// GenerateMemoBlock will create a new block to store in memo before commitment
+func GenerateMemoBlock(localPeerID string, lastBlock *Block, transaction []Transaction) *Block {
+
+	newBlock := new(Block)
+
+	newBlock.Index = lastBlock.Index + 1
+	newBlock.Transaction = transaction
+	connections := make([]BlockConnection, 0)
+	connections = append(connections, BlockConnection{PeerID: localPeerID, BlockHash: lastBlock.Hash})
 	newBlock.Connections = connections
 	t := time.Now()
 	newBlock.Timestamp = t.String()
